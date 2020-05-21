@@ -23,6 +23,19 @@ typedef MatrixGestureDetectorStartCallback = void Function(
     Matrix4 rotationDeltaMatrix,
     ScaleStartDetails scaleStartDetails);
 
+typedef MatrixGestureDetectorDoubleTapCallback = void Function(
+    Matrix4 matrix,
+    Matrix4 translationDeltaMatrix,
+    Matrix4 scaleDeltaMatrix,
+    Matrix4 rotationDeltaMatrix);
+
+typedef MatrixGestureDetectorTapDownCallback = void Function(
+    Matrix4 matrix,
+    Matrix4 translationDeltaMatrix,
+    Matrix4 scaleDeltaMatrix,
+    Matrix4 rotationDeltaMatrix,
+    TapDownDetails tapDownDetails);
+
 /// [MatrixGestureDetector] detects translation, scale and rotation gestures
 /// and combines them into [Matrix4] object that can be used by [Transform] widget
 /// or by low level [CustomPainter] code. You can customize types of reported
@@ -38,10 +51,17 @@ class MatrixGestureDetector extends StatefulWidget {
   ///
   final MatrixGestureDetectorEndCallback onMatrixUpdateEnd;
 
-
   /// [Matrix4] start notification callback
   ///
   final MatrixGestureDetectorStartCallback onMatrixUpdateStart;
+
+  /// [Matrix4] double tap callback
+  ///
+  final MatrixGestureDetectorDoubleTapCallback onDoubleTap;
+
+  /// [Matrix4] tap down callback
+  ///
+  final MatrixGestureDetectorTapDownCallback onTapDown;
 
   /// The [child] contained by this detector.
   ///
@@ -82,6 +102,8 @@ class MatrixGestureDetector extends StatefulWidget {
     @required this.onMatrixUpdate,
     @required this.onMatrixUpdateStart,
     @required this.onMatrixUpdateEnd,
+    @required this.onDoubleTap,
+    @required this.onTapDown,
     @required this.child,
     this.shouldTranslate = true,
     this.shouldScale = true,
@@ -139,6 +161,8 @@ class MatrixGestureDetectorState extends State<MatrixGestureDetector> {
       onScaleStart: onScaleStart,
       onScaleUpdate: onScaleUpdate,
       onScaleEnd: onScaleEnd,
+      onDoubleTap: onDoubleTap,
+      onTapDown: onTapDown,
       child: child,
     );
   }
@@ -165,6 +189,18 @@ class MatrixGestureDetectorState extends State<MatrixGestureDetector> {
     widget.onMatrixUpdateStart(matrix, translationDeltaMatrix, scaleDeltaMatrix,
         rotationDeltaMatrix, details);
   }
+
+  void onDoubleTap() {
+    widget.onDoubleTap(
+        matrix, translationDeltaMatrix, scaleDeltaMatrix, rotationDeltaMatrix);
+  }
+
+  void onTapDown(TapDownDetails details) {
+    widget.onTapDown(
+        matrix, translationDeltaMatrix, scaleDeltaMatrix, rotationDeltaMatrix, details);
+  }
+
+
 
   void onScaleUpdate(ScaleUpdateDetails details) {
     translationDeltaMatrix = Matrix4.identity();

@@ -70,17 +70,26 @@ class GalleryView extends StatefulWidget {
 }
 
 class GalleryViewState extends State<GalleryView>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final ValueNotifier<Matrix4> notifier = ValueNotifier(Matrix4.identity());
 
   ScrollController scrollController;
-  AnimationController controller;
-  Animation<double> animation;
+  AnimationController translateController;
+  AnimationController scaleController;
+  AnimationController scaleTranslateController;
+
+  Animation<double> translateAnimation;
+  Animation<double> scaleTranslateAnimation;
+  Animation<double> scaleAnimation;
 
   double lastScale = 1.0;
   double updatingScale = 1.0;
   double bleedScaledWidth = 0;
   double bleedHeight = 0.0;
+
+  bool scaling = false;
+
+  TapDownDetails lastTapped;
 
   @override
   void initState() {
@@ -97,35 +106,102 @@ class GalleryViewState extends State<GalleryView>
       }
     });
 
-    controller =
+    scaleController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 100));
+    scaleAnimation = Tween<double>(begin: 1, end: 1).animate(scaleController);
+    scaleController.forward();
+    scaleController.addListener(() {
+      setState(() {
+        notifier.value.setEntry(0, 0, scaleAnimation.value);
+        notifier.value.setEntry(1, 1, scaleAnimation.value);
+      });
+    });
+
+    scaleTranslateController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 100));
+
+    scaleTranslateAnimation =
+        Tween<double>(begin: 0, end: 0).animate(scaleController);
+    scaleTranslateController.forward();
+    scaleTranslateController.addListener(() {
+      setState(() {
+        translateController.stop();
+        notifier.value.setTranslationRaw(scaleTranslateAnimation.value, 0, 0);
+      });
+    });
+
+    translateController =
         AnimationController(vsync: this, duration: const Duration(seconds: 1));
+    translateAnimation =
+        Tween<double>(begin: 0, end: 0).animate(translateController);
+    translateController.forward();
 
-    animation = Tween<double>(begin: 0, end: 0).animate(controller);
-    controller.forward();
-
-    controller.addListener(() {
-      if (animation.value >= 0) {
-        controller.stop();
+    translateController.addListener(() {
+      scaleTranslateController.stop();
+      if (translateAnimation.value >= 0) {
+        translateController.stop();
         return;
       }
 
-      if (animation.value <= -bleedScaledWidth) {
-        controller.stop();
+      if (translateAnimation.value <= -bleedScaledWidth) {
+        translateController.stop();
         return;
       }
 
-      notifier.value.setTranslationRaw(animation.value, 0, 0);
-
-      notifier.notifyListeners();
+      setState(() {
+        notifier.value.setTranslationRaw(translateAnimation.value, 0, 0);
+      });
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return MatrixGestureDetector(
+      onTapDown: (m, tm, sm, rm, lastTapped) {
+        this.lastTapped = lastTapped;
+      },
+      onDoubleTap: (m, tm, sm, rm) {
+        m.setFrom(notifier.value);
+
+        var scale = 1.0;
+        if (m.getMaxScaleOnAxis() == 1.0) {
+          scale = 2.0;
+        }
+
+        var scrollTo = 0.0;
+
+        if (scale == 1.0) {
+          scaleTranslateAnimation =
+              Tween<double>(begin: m.getTranslation().s, end: 0)
+                  .animate(scaleTranslateController);
+          scrollTo = scrollController.position.pixels -
+              (lastTapped.localPosition.dy / 2);
+        } else {
+          scaleTranslateAnimation = Tween<double>(
+                  begin: m.getTranslation().s,
+                  end: -lastTapped.localPosition.dx)
+              .animate(scaleTranslateController);
+          scrollTo = scrollController.position.pixels +
+              (lastTapped.localPosition.dy / 2);
+        }
+
+        if (scrollTo < 0) {
+          scrollTo = 0;
+        } else if (scrollTo > scrollController.position.maxScrollExtent) {
+          scrollTo = scrollController.position.maxScrollExtent;
+        }
+
+        scrollController.animateTo(scrollTo,
+            duration: Duration(milliseconds: 100), curve: Curves.ease);
+        scaleTranslateController.forward(from: 0);
+
+        scaleAnimation = Tween<double>(begin: m.getMaxScaleOnAxis(), end: scale)
+            .animate(scaleController);
+        scaleController.forward(from: 0);
+      },
       onMatrixUpdateEnd: (m, tm, sm, rm, d) {
         //Don't show scroll phy when scale
-        if (m.getMaxScaleOnAxis() == lastScale) {
+        if (!scaling) {
           //scroll phy for list view
           var goto = scrollController.position.pixels -
               (d.velocity.pixelsPerSecond.dy / m.getMaxScaleOnAxis());
@@ -139,27 +215,36 @@ class GalleryViewState extends State<GalleryView>
 
           //scroll phy for horizon translation
           if (d.velocity.pixelsPerSecond.dx != 0) {
-            animation = Tween<double>(
+            translateAnimation = Tween<double>(
                     begin: m.getTranslation().s,
                     end: m.getTranslation().s + d.velocity.pixelsPerSecond.dx)
-                .animate(controller);
-            controller.value = 0;
-            controller.forward();
+                .animate(translateController);
+            translateController.forward(from: 0);
           }
         }
 
         //Store last scale for check scroll phy
+        scaling = false;
         lastScale = m.getMaxScaleOnAxis();
+        this.notifier.value = m;
       },
       shouldRotate: false,
       shouldTranslate: true,
       onMatrixUpdateStart: (m, tm, sm, rm, d) {
-        controller.stop();
+        m.setFrom(notifier.value);
+        scaleTranslateController.stop();
+        translateController.stop();
+        this.notifier.value = m;
       },
       onMatrixUpdate: (m, tm, sm, rm) {
-        if (m.getMaxScaleOnAxis() <= 1) {
+        if (m.getRow(0).s != lastScale) {
+          scaling = true;
+        }
+
+        if (m.getRow(0).s < 1) {
           m.setEntry(0, 0, 1);
           m.setEntry(1, 1, 1);
+          m.setTranslation(notifier.value.getTranslation());
         }
 
         if (updatingScale != m.getMaxScaleOnAxis()) {
