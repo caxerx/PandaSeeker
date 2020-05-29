@@ -42,8 +42,6 @@ class _GalleryListPageState extends State<GalleryListPage> {
       return;
     }
 
-    print("loadPage: $lastPage");
-
     await addItems(lastPage);
 
     lastPage += 1;

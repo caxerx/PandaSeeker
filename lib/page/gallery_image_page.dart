@@ -39,9 +39,7 @@ class GalleryImagePageState extends State<GalleryImagePage> {
       initialOffset: 510.0 * widget.targetPage,
       itemCount: galleryDetailsInfo.galleryImages.length,
       itemBuilder: (ctx, idx) {
-        return GestureDetector(
-          child: EHImage(galleryDetailsInfo.galleryImages[idx]),
-        );
+        return EHImage(galleryDetailsInfo.galleryImages[idx]);
       },
     ));
   }
@@ -337,44 +335,55 @@ class EHImage extends StatefulWidget {
 }
 
 class EHImageState extends State<EHImage> with AutomaticKeepAliveClientMixin {
+  Future<String> future;
   @override
   void initState() {
     super.initState();
+    future = widget.galleryImageInfo.fetchImageUrl();
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<String>(
-        future: widget.galleryImageInfo.fetchImageUrl(),
-        builder: (ctx, ass) {
-          if (ass.data == null) {
-            return buildLoading(0,
-                cachedHeight: widget.galleryImageInfo.cachedHeight,
-                page: widget.galleryImageInfo.page);
-          }
-          var width = MediaQuery.of(context).size.width;
-          return Padding(
-            padding: EdgeInsets.symmetric(vertical: 5),
-            child: CachedNetworkImage(
-              imageUrl: ass.data,
-              progressIndicatorBuilder: (context, url, downloadProgress) =>
-                  buildLoading(downloadProgress.progress,
-                      cachedHeight: widget.galleryImageInfo.cachedHeight,
-                      page: widget.galleryImageInfo.page),
-              errorWidget: (context, url, error) =>
-                  buildError(page: widget.galleryImageInfo.page),
-              imageBuilder: (context, image) {
-                image
-                    .resolve(ImageConfiguration())
-                    .addListener(ImageStreamListener((image, sync) {
-                  widget.galleryImageInfo.cachedHeight =
-                      width / image.image.width * image.image.height;
-                }));
-                return Image(image: image);
-              },
-            ),
-          );
+    super.build(context);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onLongPress: (){
+        setState(() {
+          future = widget.galleryImageInfo.refetchImageUrl();
         });
+      },
+      child: FutureBuilder<String>(
+          future: future,
+          builder: (ctx, snapshot) {
+            if (snapshot.data == null) {
+              return buildLoading(0,
+                  cachedHeight: widget.galleryImageInfo.cachedHeight,
+                  page: widget.galleryImageInfo.page);
+            }
+            var width = MediaQuery.of(context).size.width;
+            return Padding(
+              padding: EdgeInsets.symmetric(vertical: 5),
+              child: CachedNetworkImage(
+                imageUrl: snapshot.data,
+                progressIndicatorBuilder: (context, url, downloadProgress) =>
+                    buildLoading(downloadProgress.progress,
+                        cachedHeight: widget.galleryImageInfo.cachedHeight,
+                        page: widget.galleryImageInfo.page),
+                errorWidget: (context, url, error) =>
+                    buildError(page: widget.galleryImageInfo.page),
+                imageBuilder: (context, image) {
+                  image
+                      .resolve(ImageConfiguration())
+                      .addListener(ImageStreamListener((image, sync) {
+                    widget.galleryImageInfo.cachedHeight =
+                        width / image.image.width * image.image.height;
+                  }));
+                  return Image(image: image);
+                },
+              ),
+            );
+          }),
+    );
   }
 
   Widget buildLoading(double progress, {double cachedHeight, int page}) {
@@ -419,5 +428,5 @@ class EHImageState extends State<EHImage> with AutomaticKeepAliveClientMixin {
   }
 
   @override
-  bool get wantKeepAlive => widget.galleryImageInfo.cachedHeight == null;
+  bool get wantKeepAlive => true;
 }

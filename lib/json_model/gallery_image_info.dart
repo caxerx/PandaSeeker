@@ -1,4 +1,3 @@
-import 'package:pandaseeker/json_model/gallery_info.dart';
 import 'package:pandaseeker/panda_parser.dart';
 
 class GalleryImageInfo {

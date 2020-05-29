@@ -23,12 +23,12 @@ class MyApp extends StatelessWidget {
         child: MaterialApp(
           title: GlobalSetting.APP_NAME,
           theme: ThemeData(
-              textTheme: GoogleFonts.openSansTextTheme(),
+              textTheme: GoogleFonts.oxygenTextTheme(),
               secondaryHeaderColor: Colors.pink),
           darkTheme: ThemeData(
               brightness: Brightness.dark,
               textTheme:
-              GoogleFonts.openSansTextTheme(ThemeData
+              GoogleFonts.oxygenTextTheme(ThemeData
                   .dark()
                   .textTheme)),
           home: GalleryListPage(),
